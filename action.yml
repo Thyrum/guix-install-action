@@ -25,51 +25,74 @@ runs:
   steps:
     # The default locale on Debian and Ubuntu is "C.UTF-8" which does not exist
     # in vanilla glibc.  Change to something that works for Guix and Debuntu.
-    - run: echo LANG=en_US.utf8 >> $GITHUB_ENV
+    - run: |
+        echo '::group::Set LANG'
+        echo LANG=en_US.utf8 >> $GITHUB_ENV
+        echo '::endgroup::'
       shell: bash
       name: Set LANG
     - run: |
+        echo '::group::Download'
         wget -nv https://git.savannah.gnu.org/cgit/guix.git/plain/etc/guix-install.sh -O guix-install.sh
         wget -nv https://ci.guix.gnu.org/search/latest/archive?query=spec:tarball+status:success+system:x86_64-linux+guix-binary.tar.xz -O guix-binary-nightly.x86_64-linux.tar.xz
+        echo '::endgroup::'
       shell: bash
       name: Download
     - run: |
+        echo '::group::Fetch key'
         wget "https://sv.gnu.org/people/viewgpg.php?user_id=127547" -qO - | sudo gpg --import -
         wget "https://sv.gnu.org/people/viewgpg.php?user_id=15145" -qO - | sudo gpg --import -
+        echo '::endgroup::'
       shell: bash
       name: Fetch key
     - run: |
+        echo '::group::Install Guix'
         export GUIX_BINARY_FILE_NAME=guix-binary-nightly.x86_64-linux.tar.xz
         sudo --preserve-env=GUIX_BINARY_FILE_NAME -- bash -c 'yes | bash guix-install.sh'
+        echo '::endgroup::'
       shell: bash
       name: Install Guix
-    - run: sudo -i guix archive --generate-key
+    - run: |
+        echo '::group::Generate keys'
+        sudo -i guix archive --generate-key
+        echo '::engroup::'
       shell: bash
       name: Generate keys
     - run: |
+        echo '::group::Create channel file'
         cat <<EOF > ${{ runner.temp }}/channels.scm
         ${{ inputs.channels }}
         EOF
+        echo '::endgroup::'
       shell: bash
       name: Create channel file
-    - run: guix pull --fallback -C ${{ runner.temp }}/channels.scm
+    - run: |
+        echo '::group::Update Guix'
+        guix pull --fallback -C ${{ runner.temp }}/channels.scm
+        echo '::endgroup::'
       shell: bash
       name: Update Guix
     # Use daemon from user, so we don’t have to `guix pull` twice.
     - run: |
+        echo '::group::Restart daemon'
         sudo sed -i "s/root/${USER}/" /etc/systemd/system/guix-daemon.service
         sudo systemctl daemon-reload
         sudo systemctl restart guix-daemon
+        echo '::endgroup::'
       shell: bash
       name: Restart daemon
     # Initially inherit root’s Guix profile, so we can use guix commands without sudo
     - run: |
+        echo '::group::Set PATH'
         echo "$HOME/.config/guix/current/bin" >> $GITHUB_PATH
+        echo '::endgroup::'
       shell: bash
       name: Set PATH
     # Substitute newlines to work-around GitHubs single-line limitation.
     - run: |
+        echo '::group::guix-describe::'
         echo "::set-output name=channels::$(guix describe -f channels | tr '\n' ' ')"
+        echo '::endgroup::'
       shell: bash
       name: guix describe
       id: guix-describe
